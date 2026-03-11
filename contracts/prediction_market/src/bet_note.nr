@@ -1,15 +1,16 @@
 use aztec::{macros::notes::note, protocol::{traits::Packable, address::AztecAddress}};
 
-// BetNote stores a user's private bet on a prediction market.
+// PositionNote stores a user's private bet on a prediction market.
 // This note is encrypted and stored in the note hash tree - only the owner's PXE can decrypt it.
-// The direction (yes/no) and amount are never revealed on-chain.
+// The outcome_index and amount are never revealed on-chain.
 #[derive(Eq, Packable)]
 #[note]
 pub struct BetNote {
     // The market this bet is for
     pub market_id: Field,
-    // true = YES, false = NO
-    pub direction: bool,
+    // Outcome index: 0 = first outcome, 1 = second, etc.
+    // For binary markets: 0 = NO, 1 = YES
+    pub outcome_index: u8,
     // Amount wagered
     pub amount: Field,
     // The bettor - only they can read this note
@@ -17,7 +18,7 @@ pub struct BetNote {
 }
 
 impl BetNote {
-    pub fn new(market_id: Field, direction: bool, amount: Field, owner: AztecAddress) -> Self {
-        Self { market_id, direction, amount, owner }
+    pub fn new(market_id: Field, outcome_index: u8, amount: Field, owner: AztecAddress) -> Self {
+        Self { market_id, outcome_index, amount, owner }
     }
 }

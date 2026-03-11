@@ -6,6 +6,9 @@ import { getSponsoredFPCInstance } from "../src/utils/sponsored_fpc.js";
 import { SponsoredFPCContractArtifact } from "@aztec/noir-contracts.js/SponsoredFPC";
 import { deploySchnorrAccount } from "../src/utils/deploy_account.js";
 import { getTimeouts } from "../config/config.js";
+import { deployToken } from "../src/utils/token_helpers.js";
+import { Fr } from "@aztec/aztec.js/fields";
+import { deriveKeys } from "@aztec/aztec.js/keys";
 
 async function main() {
     const logger: Logger = createLogger('aztec:prediction-market');
@@ -28,10 +31,22 @@ async function main() {
     const address = accountManager.address;
     logger.info(`Account deployed at: ${address}`);
 
-    // Deploy prediction market contract
+    // Deploy Token contract
+    const token = await deployToken(wallet, address, sponsoredPaymentMethod, timeouts, logger);
+
+    // Deploy prediction market contract with public keys (so it can hold private token notes)
     logger.info('Deploying PredictionMarket contract...');
-    const deployRequest = PredictionMarketContract.deploy(wallet, address);
+    const pmSecretKey = Fr.random();
+    const pmPublicKeys = (await deriveKeys(pmSecretKey)).publicKeys;
+
+    const deployRequest = PredictionMarketContract.deployWithPublicKeys(
+        pmPublicKeys, wallet, address, token.address,
+    );
     await deployRequest.simulate({ from: address });
+
+    const pmInstance = await deployRequest.getInstance();
+    await wallet.registerContract(pmInstance, PredictionMarketContract.artifact, pmSecretKey);
+
     const { contract, instance } = await deployRequest.send({
         from: address,
         fee: { paymentMethod: sponsoredPaymentMethod },
@@ -39,6 +54,7 @@ async function main() {
     });
 
     logger.info(`PredictionMarket deployed at: ${contract.address}`);
+    logger.info(`Token: ${token.address}`);
     logger.info(`Admin: ${address}`);
 
     if (instance) {
